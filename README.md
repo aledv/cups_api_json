@@ -15,14 +15,15 @@ This project provides an API to interact with **CUPS** (Common UNIX Printing Sys
 
 ## Endpoints
 ### GET `/cups/status`
-Returns the status of the default printer, including the count of completed and pending jobs.
+Returns the status of the default printer, including the count of completed and pending jobs and the status.
 
 ### Example Response:
 ```json
 {
   "default_printer": "ML-1640-Series",
   "completed_jobs_count": 5,
-  "pending_jobs_count": 2
+  "pending_jobs_count": 2,
+  "printer_status": "idle"
 }
 ```
 
