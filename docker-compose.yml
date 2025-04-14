@@ -1,7 +1,9 @@
 services:
   cups-api:
-    build: .
+    image: cups-api
     container_name: cups-api
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"   
     ports:
       - "5001:5001"   # Mappa la porta 5001 del container alla porta 5001 del host
     volumes:
