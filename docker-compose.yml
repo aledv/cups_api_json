@@ -11,5 +11,10 @@ services:
     privileged: true  # Permette l'accesso privilegiato per interagire con CUPS
     environment:
       - FLASK_ENV=production
-    restart: always
-    network_mode: "host"  # Usa la rete host per comunicare con CUPS, per evitare problemi di connessione
+    restart: unless-stopped
+    networks:
+      - shared_network
+
+networks:
+  shared_network:
+    external: true

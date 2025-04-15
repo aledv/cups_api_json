@@ -57,14 +57,10 @@ The project includes a `docker-compose.yml` file that simplifies the process of 
 
 ### Example `docker-compose.yml`:
 ```yaml
-version: '3.8'
-
 services:
   cups-api:
     build: .
     container_name: cups-api
-    ports:
-      - "5001:5001"   # Exposes the API on port 5001
     volumes:
       - /var/run/cups/cups.sock:/var/run/cups/cups.sock  # Mounts the CUPS socket
     privileged: true  # Required to interact with the CUPS service
