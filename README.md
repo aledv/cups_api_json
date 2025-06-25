@@ -1,23 +1,16 @@
+# CUPS Status Monitor
 
-# CUPS API Status
+Un servizio Docker che monitora lo stato del server CUPS locale e fornisce un endpoint REST per ottenere informazioni su stampanti e job di stampa.
 
-## Overview
-This project provides an API to interact with **CUPS** (Common UNIX Printing System) and retrieve the status of printers. The service exposes an endpoint that returns information about the default printer and the number of completed and pending jobs for that printer in **JSON format**.
+## Funzionalità
 
-## Features
-- Returns the default printer for the system.
-- Provides a count of completed and pending print jobs.
-- Simple Flask-based microservice.
+- **Endpoint `/cups/status`**: Restituisce informazioni complete sullo stato di CUPS
+- **Endpoint `/health`**: Health check per il container
+- **Monitoraggio in tempo reale**: Accesso diretto al server CUPS locale
+- **Container sicuro**: Esecuzione con utente non-root
 
-## Prerequisites
-- **CUPS** should be installed and configured on the host machine.
-- Docker and Docker Compose installed on your system.
+## Risposta API
 
-## Endpoints
-### GET `/cups/status`
-Returns the status of the default printer, including the count of completed and pending jobs and the status.
-
-### Example Response:
 ```json
 {
   "default_printer": "ML-1640-Series",
@@ -27,64 +20,91 @@ Returns the status of the default printer, including the count of completed and 
 }
 ```
 
-## Installation
+### Stati stampante possibili:
+- `idle`: Stampante disponibile
+- `processing`: Stampante in fase di stampa
+- `stopped`: Stampante fermata
+- `error`: Errore di comunicazione
+- `not_found`: Stampante non trovata
+- `unknown`: Stato sconosciuto
 
-### 1. Clone the repository (or download the files):
+## Quick Start
+
+### Opzione 1: Script automatico
 ```bash
-git clone <repository-url>
-cd <repository-directory>
+chmod +x build-and-run.sh
+./build-and-run.sh
 ```
 
-### 2. Build and start the container using Docker Compose:
+### Opzione 2: Docker Compose
 ```bash
-docker-compose up --build
+docker-compose up -d
 ```
 
-### 3. Verify the API is running:
-Once the container is up and running, you can access the API at:
-```
-http://localhost:5001/cups/status
-```
-
-### 4. Stopping the container:
-To stop the service, use:
+### Opzione 3: Build manuale
 ```bash
-docker-compose down
+# Build
+docker build -t cups-status-monitor .
+
+# Run
+docker run -d \
+  --name cups-status-monitor \
+  --network host \
+  -p 5001:5001 \
+  -v /var/run/cups/cups.sock:/var/run/cups/cups.sock:ro \
+  cups-status-monitor
 ```
 
-## Docker Compose Configuration
-The project includes a `docker-compose.yml` file that simplifies the process of building and running the service.
+## Test dell'endpoint
 
-### Example `docker-compose.yml`:
-```yaml
-services:
-  cups-api:
-    build: .
-    container_name: cups-api
-    volumes:
-      - /var/run/cups/cups.sock:/var/run/cups/cups.sock  # Mounts the CUPS socket
-    privileged: true  # Required to interact with the CUPS service
-    environment:
-      - FLASK_ENV=production
-    restart: always
-    network_mode: "host"  # Uses host network to avoid connectivity issues with CUPS
+```bash
+# Status CUPS
+curl http://localhost:5001/cups/status
+
+# Health check
+curl http://localhost:5001/health
 ```
 
-## Dockerfile
-The project includes a `Dockerfile` to build the image for the Flask API:
-```Dockerfile
-FROM python:3.11-slim
+## Requisiti
 
-WORKDIR /app
+- Docker
+- Server CUPS attivo su localhost
+- Porta 5001 disponibile
 
-COPY app.py .
-RUN pip install flask && apt-get update && apt-get install -y cups-client && apt-get clean
+## Configurazione
 
-EXPOSE 5001
+Il container utilizza `network_mode: host` per accedere al server CUPS locale. Se CUPS utilizza un socket Unix, questo viene montato come volume read-only.
 
-CMD ["python", "app.py"]
+## Troubleshooting
+
+### Controllo logs
+```bash
+docker logs cups-status-monitor
 ```
 
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Verificare CUPS
+```bash
+# Controlla se CUPS è attivo
+systemctl status cups
 
+# Testa connessione locale
+lpstat -t
+```
+
+### Problemi comuni
+
+1. **Errore di connessione CUPS**: Verifica che CUPS sia avviato e accessibile
+2. **Porta 5001 occupata**: Cambia il mapping porta nel docker run o docker-compose
+3. **Permessi socket**: Assicurati che il socket CUPS abbia i permessi corretti
+
+## Struttura del progetto
+
+```
+.
+├── app.py              # Applicazione Flask principale
+├── Dockerfile          # Definizione immagine Docker
+├── requirements.txt    # Dipendenze Python
+├── docker-compose.yml  # Configurazione Docker Compose
+├── build-and-run.sh   # Script di build e avvio
+└── README.md          # Questa documentazione
+```

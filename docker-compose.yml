@@ -1,20 +1,13 @@
 services:
-  cups-api:
-    image: cups-api
-    container_name: cups-api
+  cups-monitor:
+    build: .
+    container_name: cups-status-monitor
     labels:
       - "com.centurylinklabs.watchtower.enable=false"   
-    ports:
-      - "5001:5001"   # Mappa la porta 5001 del container alla porta 5001 del host
-    volumes:
-      - /var/run/cups/cups.sock:/var/run/cups/cups.sock  # Monta il socket CUPS per interagire con la stampante
-    privileged: true  # Permette l'accesso privilegiato per interagire con CUPS
-    environment:
-      - FLASK_ENV=production
     restart: unless-stopped
-    networks:
-      - shared_network
-
-networks:
-  shared_network:
-    external: true
+    environment:
+      - CUPS_SERVER=localhost:631
+    volumes:
+      # Se CUPS usa socket Unix invece di TCP
+      - /var/run/cups/cups.sock:/var/run/cups/cups.sock:ro
+    network_mode: host  # Necessario per accedere a CUPS localhost
