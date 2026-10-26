@@ -1,110 +1,83 @@
-# CUPS Status Monitor
+# cups_api_json
 
-Un servizio Docker che monitora lo stato del server CUPS locale e fornisce un endpoint REST per ottenere informazioni su stampanti e job di stampa.
+A tiny REST API that reports the state of a local [CUPS](https://openprinting.github.io/cups/) print server as JSON:
+default printer, its status and the number of pending and completed jobs. Handy for dashboards (e.g.
+Homepage's custom API widget), Home Assistant REST sensors or monitoring.
 
-## Funzionalità
+## API
 
-- **Endpoint `/cups/status`**: Restituisce informazioni complete sullo stato di CUPS
-- **Endpoint `/health`**: Health check per il container
-- **Monitoraggio in tempo reale**: Accesso diretto al server CUPS locale
-- **Container sicuro**: Esecuzione con utente non-root
-
-## Risposta API
+`GET /cups/status`
 
 ```json
 {
-  "default_printer": "ML-1640-Series",
+  "default_printer": "Office_Laser",
   "completed_jobs_count": 5,
   "pending_jobs_count": 2,
   "printer_status": "idle"
 }
 ```
 
-### Stati stampante possibili:
-- `idle`: Stampante disponibile
-- `processing`: Stampante in fase di stampa
-- `stopped`: Stampante fermata
-- `error`: Errore di comunicazione
-- `not_found`: Stampante non trovata
-- `unknown`: Stato sconosciuto
+`printer_status` is one of `idle`, `processing`, `stopped`, `unknown` (state not recognised or no default printer),
+`not_found` (the default printer no longer exists) or `error` (CUPS not reachable, HTTP 503).
+`completed_jobs_count` counts at most `COMPLETED_JOBS_LIMIT` jobs (default 100).
 
-## Quick Start
+`GET /health` returns `{"status": "healthy"}`. The Docker image uses it as its health check.
 
-### Opzione 1: Script automatico
-```bash
-chmod +x build-and-run.sh
-./build-and-run.sh
-```
+## Quick start
 
-### Opzione 2: Docker Compose
-```bash
-docker-compose up -d
-```
-
-### Opzione 3: Build manuale
-```bash
-# Build
-docker build -t cups-status-monitor .
-
-# Run
-docker run -d \
-  --name cups-status-monitor \
-  --network host \
-  -p 5001:5001 \
-  -v /var/run/cups/cups.sock:/var/run/cups/cups.sock:ro \
-  cups-status-monitor
-```
-
-## Test dell'endpoint
+Requirements: Docker with Compose, and CUPS running on the same host.
 
 ```bash
-# Status CUPS
+git clone https://github.com/aledv/cups_api_json.git
+cd cups_api_json
+docker compose up -d --build
 curl http://localhost:5001/cups/status
-
-# Health check
-curl http://localhost:5001/health
 ```
 
-## Requisiti
+The container uses the host network to reach CUPS on `localhost:631`, so `ports:` mappings don't apply: change the
+port with `PORT` instead. If CUPS only listens on its Unix socket, the compose file mounts `/run/cups/cups.sock`.
 
-- Docker
-- Server CUPS attivo su localhost
-- Porta 5001 disponibile
+Without Compose:
 
-## Configurazione
-
-Il container utilizza `network_mode: host` per accedere al server CUPS locale. Se CUPS utilizza un socket Unix, questo viene montato come volume read-only.
-
-## Troubleshooting
-
-### Controllo logs
 ```bash
-docker logs cups-status-monitor
+docker build -t cups-api .
+docker run -d --name cups-api --network host -e PORT=5001 \
+  -v /run/cups/cups.sock:/run/cups/cups.sock:ro cups-api
 ```
 
-### Verificare CUPS
+## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `5001` | Listening port |
+| `CUPS_SERVER` | CUPS default | CUPS server as `host[:port]` or a socket path |
+| `COMPLETED_JOBS_LIMIT` | `100` | Maximum number of completed jobs counted |
+
+The API has no authentication: keep it on your LAN.
+
+## Development
+
 ```bash
-# Controlla se CUPS è attivo
-systemctl status cups
-
-# Testa connessione locale
-lpstat -t
+pip install -r requirements-dev.txt          # Flask + ruff; tests use a fake cups module
+python -m unittest discover -s tests -v      # tests
+ruff check . && ruff format --check .        # Python linter
+hadolint Dockerfile                          # Dockerfile linter
 ```
 
-### Problemi comuni
+Running the app itself needs `pycups` (`apt install libcups2-dev` then `pip install -r requirements.txt`) and a CUPS
+server: `gunicorn --bind 0.0.0.0:5001 app:app`.
 
-1. **Errore di connessione CUPS**: Verifica che CUPS sia avviato e accessibile
-2. **Porta 5001 occupata**: Cambia il mapping porta nel docker run o docker-compose
-3. **Permessi socket**: Assicurati che il socket CUPS abbia i permessi corretti
+CI (GitHub Actions) runs the linters, the tests and a Docker build on every push.
 
-## Struttura del progetto
+## Project structure
 
 ```
-.
-├── app.py              # Applicazione Flask principale
-├── Dockerfile          # Definizione immagine Docker
-├── requirements.txt    # Dipendenze Python
-├── docker-compose.yml  # Configurazione Docker Compose
-├── build-and-run.sh   # Script di build e avvio
-└── README.md          # Questa documentazione
+app.py               Flask app (served by gunicorn in the container)
+tests/test_app.py    unit tests with a fake cups module
+Dockerfile           two-stage build, runs as a non-root user
+docker-compose.yml   host network + optional CUPS socket mount
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE).

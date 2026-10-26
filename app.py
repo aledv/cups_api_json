@@ -1,117 +1,77 @@
-#!/usr/bin/env python3
+"""Small REST API exposing the state of a local CUPS server as JSON."""
+
+import logging
+import os
+
 import cups
 from flask import Flask, jsonify
-import logging
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("cups-api")
 
-def get_cups_connection():
-    """Stabilisce connessione con CUPS"""
-    try:
-        # Connessione al server CUPS (localhost:631 di default)
-        conn = cups.Connection()
-        return conn
-    except Exception as e:
-        logging.error(f"Errore connessione CUPS: {e}")
-        return None
+# CUPS printer-state values (RFC 8011): 3 idle, 4 processing, 5 stopped
+PRINTER_STATES = {3: "idle", 4: "processing", 5: "stopped"}
+COMPLETED_JOBS_LIMIT = int(os.environ.get("COMPLETED_JOBS_LIMIT", "100"))
 
-def get_default_printer(conn):
-    """Ottiene la stampante predefinita"""
-    try:
-        return conn.getDefault()
-    except Exception as e:
-        logging.error(f"Errore ottenimento stampante predefinita: {e}")
-        return None
 
-def get_printer_status(conn, printer_name):
-    """Ottiene lo stato della stampante"""
-    try:
-        if not printer_name:
-            return "unknown"
-        
-        printers = conn.getPrinters()
-        if printer_name in printers:
-            printer_info = printers[printer_name]
-            state = printer_info.get('printer-state', 3)
-            
-            # Stati CUPS: 3=idle, 4=processing, 5=stopped
-            if state == 3:
-                return "idle"
-            elif state == 4:
-                return "processing"
-            elif state == 5:
-                return "stopped"
-            else:
-                return "unknown"
+def connect():
+    """Connection to CUPS. CUPS_SERVER (host[:port] or socket path) overrides the default."""
+    server = os.environ.get("CUPS_SERVER")
+    if server:
+        cups.setServer(server)
+    return cups.Connection()
+
+
+def printer_status(conn, printer):
+    if not printer:
+        return "unknown"
+    info = conn.getPrinters().get(printer)
+    if info is None:
         return "not_found"
-    except Exception as e:
-        logging.error(f"Errore ottenimento stato stampante: {e}")
-        return "error"
+    return PRINTER_STATES.get(info.get("printer-state"), "unknown")
 
-def get_jobs_count(conn):
-    """Ottiene il conteggio dei job completati e pendenti"""
-    try:
-        # Job attivi/pendenti
-        active_jobs = conn.getJobs(which_jobs='not-completed')
-        pending_count = len(active_jobs)
-        
-        # Job completati (limitiamo agli ultimi per performance)
-        completed_jobs = conn.getJobs(which_jobs='completed', limit=100)
-        completed_count = len(completed_jobs)
-        
-        return completed_count, pending_count
-    except Exception as e:
-        logging.error(f"Errore ottenimento job: {e}")
-        return 0, 0
 
-@app.route('/cups/status', methods=['GET'])
-def cups_status():
-    """Endpoint principale che restituisce lo status di CUPS"""
-    try:
-        # Connessione a CUPS
-        conn = get_cups_connection()
-        if not conn:
-            return jsonify({
-                "error": "Impossibile connettersi a CUPS",
-                "default_printer": None,
-                "completed_jobs_count": 0,
-                "pending_jobs_count": 0,
-                "printer_status": "error"
-            }), 500
-        
-        # Ottieni stampante predefinita
-        default_printer = get_default_printer(conn)
-        
-        # Ottieni stato stampante
-        printer_status = get_printer_status(conn, default_printer)
-        
-        # Ottieni conteggio job
-        completed_count, pending_count = get_jobs_count(conn)
-        
-        response = {
-            "default_printer": default_printer,
-            "completed_jobs_count": completed_count,
-            "pending_jobs_count": pending_count,
-            "printer_status": printer_status
-        }
-        
-        return jsonify(response)
-        
-    except Exception as e:
-        logging.error(f"Errore generale: {e}")
-        return jsonify({
-            "error": str(e),
+def job_counts(conn):
+    """(completed, pending). Completed jobs are capped at COMPLETED_JOBS_LIMIT."""
+    pending = len(conn.getJobs(which_jobs="not-completed"))
+    completed = len(conn.getJobs(which_jobs="completed", limit=COMPLETED_JOBS_LIMIT))
+    return completed, pending
+
+
+def error_response():
+    return jsonify(
+        {
+            "error": "CUPS not reachable",
             "default_printer": None,
             "completed_jobs_count": 0,
             "pending_jobs_count": 0,
-            "printer_status": "error"
-        }), 500
+            "printer_status": "error",
+        }
+    ), 503
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({"status": "healthy"}), 200
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=False)
+@app.get("/cups/status")
+def cups_status():
+    try:
+        conn = connect()
+        printer = conn.getDefault()
+        completed, pending = job_counts(conn)
+        status = printer_status(conn, printer)
+    except Exception:
+        # Details go to the log only, never to the client.
+        log.exception("CUPS query failed")
+        return error_response()
+    return jsonify(
+        {
+            "default_printer": printer,
+            "completed_jobs_count": completed,
+            "pending_jobs_count": pending,
+            "printer_status": status,
+        }
+    )
+
+
+@app.get("/health")
+def health():
+    return jsonify({"status": "healthy"})

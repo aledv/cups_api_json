@@ -1,0 +1,3 @@
+ignored:
+  - DL3008  # unpinned apt packages: old versions vanish from the mirrors
+failure-threshold: warning

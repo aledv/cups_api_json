@@ -1,13 +1,14 @@
 services:
-  cups-monitor:
+  cups-api:
     build: .
-    container_name: cups-status-monitor
-    labels:
-      - "com.centurylinklabs.watchtower.enable=false"   
+    container_name: cups-api
     restart: unless-stopped
+    # Host network so the container reaches CUPS on localhost:631.
+    # Change the listening port with PORT (ports: mappings are ignored in host mode).
+    network_mode: host
     environment:
-      - CUPS_SERVER=localhost:631
+      PORT: "5001"
+      # CUPS_SERVER: "localhost:631"   # or a socket path, e.g. /run/cups/cups.sock
     volumes:
-      # Se CUPS usa socket Unix invece di TCP
-      - /var/run/cups/cups.sock:/var/run/cups/cups.sock:ro
-    network_mode: host  # Necessario per accedere a CUPS localhost
+      # Only needed if CUPS listens on its Unix socket
+      - /run/cups/cups.sock:/run/cups/cups.sock:ro
