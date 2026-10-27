@@ -1,6 +1,6 @@
-# cups_api_json
+# cups-api-json
 
-[![CI](https://github.com/aledv/cups_api_json/actions/workflows/ci.yml/badge.svg)](https://github.com/aledv/cups_api_json/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/aledv/cups-api-json/actions/workflows/ci.yml/badge.svg)](https://github.com/aledv/cups-api-json/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A tiny REST API that reports the state of a local [CUPS](https://openprinting.github.io/cups/) print server as JSON:
 default printer, its status and the number of pending and completed jobs. Handy for dashboards (e.g.
@@ -30,8 +30,8 @@ Homepage's custom API widget), Home Assistant REST sensors or monitoring.
 Requirements: Docker with Compose, and CUPS running on the same host.
 
 ```bash
-git clone https://github.com/aledv/cups_api_json.git
-cd cups_api_json
+git clone https://github.com/aledv/cups-api-json.git
+cd cups-api-json
 docker compose up -d --build
 curl http://localhost:5001/cups/status
 ```
