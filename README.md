@@ -1,5 +1,7 @@
 # cups_api_json
 
+[![CI](https://github.com/aledv/cups_api_json/actions/workflows/ci.yml/badge.svg)](https://github.com/aledv/cups_api_json/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A tiny REST API that reports the state of a local [CUPS](https://openprinting.github.io/cups/) print server as JSON:
 default printer, its status and the number of pending and completed jobs. Handy for dashboards (e.g.
 Homepage's custom API widget), Home Assistant REST sensors or monitoring.
@@ -77,6 +79,10 @@ tests/test_app.py    unit tests with a fake cups module
 Dockerfile           two-stage build, runs as a non-root user
 docker-compose.yml   host network + optional CUPS socket mount
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. Please run the linters and tests (see [Development](#development)) before opening a pull request.
 
 ## License
 
